@@ -85,6 +85,7 @@ def handle_command(command, channel):
             "color": "#36a64f",
             "pretext": "The current oncall network engineer is:",
             "title": oncall["name"],
+            "title_link": oncall["html_url"],
             "fields": [{
                 "title": "IRC",
                 "value": oncall["irc_nick"],

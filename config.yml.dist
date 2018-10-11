@@ -8,5 +8,6 @@ default_oncall:
     slack_nick: n/a
     email: doesn't have one!
     avatar_url: https://www.gravatar.com/avatar/00000000000000000000000000000000?d=robohash&f=y
+    html_url: https://www.pagerduty.com/
     start: whenever
     end: someday
