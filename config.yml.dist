@@ -1,3 +1,12 @@
 slack_api_token: NOT_SET
 pagerduty_api_token: NOT_SET
 pagerduty_oncall_schedule: NOT_SET
+pagerduty_escalation_policy: NOT_SET
+default_oncall:
+    name: Wesley!
+    irc_nick: wesley
+    slack_nick: n/a
+    email: doesn't have one!
+    avatar_url: https://www.gravatar.com/avatar/00000000000000000000000000000000?d=robohash&f=y
+    start: whenever
+    end: someday

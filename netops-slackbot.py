@@ -5,6 +5,7 @@ import re
 from slackclient import SlackClient
 import yaml
 import json
+import requests
 
 with open("config.yml", 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
@@ -15,10 +16,34 @@ slack_client = SlackClient(cfg['slack_api_token'])
 # starterbot's user ID in Slack: value is assigned after the bot starts up
 starterbot_id = None
 
+# oncall person object
+oncall = cfg["default_oncall"]
+
 # constants
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
 EXAMPLE_COMMAND = "do"
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
+
+def get_oncall():
+    headers = {
+        'Authorization': 'Token token={0}'.format(cfg["pagerduty_api_token"]),
+        'Content-Type': 'application/vnd.pagerduty+json;version=2',
+    }
+    url = 'https://api.pagerduty.com/oncalls?time_zone=UTC&include%5B%5D=users&escalation_policy_ids%5B%5D={0}&schedule_ids%5B%5D={1}'.format(cfg["pagerduty_escalation_policy"],cfg["pagerduty_oncall_schedule"])
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+    except requests.Timeout:
+        print "PagerDuty API timed out!"
+
+    decoded = json.loads(r.text)
+    oncall = decoded["oncalls"][0]["user"]
+    oncall["start"] = decoded["oncalls"][0]["start"]
+    oncall["end"] = decoded["oncalls"][0]["end"]
+    # TODO: parse text of "description" field ("Bio" in the UI) to get IRC
+    # and Slack if present, but fall back to first part of email if not given
+    oncall["irc_nick"] = oncall["email"].split("@")[0]
+    oncall["slack_nick"] = oncall["email"].split("@")[0]
+    return oncall
 
 def parse_bot_commands(slack_events):
     """
@@ -59,23 +84,24 @@ def handle_command(command, channel):
         attachments = json.dumps([{
             "color": "#36a64f",
             "pretext": "The current oncall network engineer is:",
-            "title": cfg["demo_user"]["name"],
+            "title": oncall["name"],
             "fields": [{
                 "title": "IRC",
-                "value": cfg["demo_user"]["irc"],
+                "value": oncall["irc_nick"],
                 "short": "true"
             },
             {
                 "title": "Slack",
-                "value": cfg["demo_user"]["slack"],
+                "value": oncall["slack_nick"],
                 "short": "true"
             },
             {
                 "title": "Email",
-                "value": cfg["demo_user"]["email"],
+                "value": oncall["email"],
                 "short": "true"
             }],
-            "thumb_url": cfg["demo_user"]["avatar"]
+            "thumb_url": oncall["avatar_url"],
+            "footer": "Oncall from {0} to {1}.".format(oncall["start"],oncall["end"])
         }])
         slack_client.api_call(
                 "chat.postMessage",
@@ -95,6 +121,7 @@ if __name__ == "__main__":
         print("Starter Bot connected and running!")
         # Read bot's user ID by calling Web API method `auth.test`
         starterbot_id = slack_client.api_call("auth.test")["user_id"]
+        oncall = get_oncall()
         while True:
             command, channel = parse_bot_commands(slack_client.rtm_read())
             if command:
