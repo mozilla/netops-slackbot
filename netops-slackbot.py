@@ -1,8 +1,10 @@
+#!/usr/bin/env python
 import os
 import time
 import re
 from slackclient import SlackClient
 import yaml
+import json
 
 with open("config.yml", 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
@@ -74,7 +76,7 @@ def handle_command(command, channel):
                 "short": "true"
             }],
             "thumb_url": cfg["demo_user"]["avatar"]
-        }]
+        }])
         slack_client.api_call(
                 "chat.postMessage",
                 channel = channel,
