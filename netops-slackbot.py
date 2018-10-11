@@ -122,6 +122,7 @@ if __name__ == "__main__":
         print("Starter Bot connected and running!")
         # Read bot's user ID by calling Web API method `auth.test`
         starterbot_id = slack_client.api_call("auth.test")["user_id"]
+        # TODO: make it do this once per minute and automatically post it to #netops when it changes
         oncall = get_oncall()
         while True:
             command, channel = parse_bot_commands(slack_client.rtm_read())
