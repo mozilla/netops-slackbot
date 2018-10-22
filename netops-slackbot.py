@@ -67,6 +67,39 @@ def parse_direct_mention(message_text):
     # the first group contains the username, the second group contains the remaining message
     return (matches.group(1), matches.group(2).strip()) if matches else (None, None)
 
+def post_current_oncall(channel, pretext="The current oncall network engineer is:"):
+    """
+        Posts the current oncall information to the given channel
+    """
+    attachments = json.dumps([{
+        "color": "#36a64f",
+        "pretext": pretext,
+        "title": oncall["name"],
+        "title_link": oncall["html_url"],
+        "fields": [{
+            "title": "IRC",
+            "value": oncall["irc_nick"],
+            "short": "true"
+        },
+        {
+            "title": "Slack",
+            "value": oncall["slack_nick"],
+            "short": "true"
+        },
+        {
+            "title": "Email",
+            "value": oncall["email"],
+            "short": "true"
+        }],
+        "thumb_url": oncall["avatar_url"],
+        "footer": "Oncall from {0} to {1}.".format(oncall["start"],oncall["end"])
+    }])
+    slack_client.api_call(
+            "chat.postMessage",
+            channel = channel,
+            attachments = attachments)
+    return
+
 def handle_command(command, channel):
     """
         Executes bot command if the command is known
@@ -81,33 +114,7 @@ def handle_command(command, channel):
         response = "Sure...write some more code then I can do that!"
 
     if command.startswith("oncall"):
-        attachments = json.dumps([{
-            "color": "#36a64f",
-            "pretext": "The current oncall network engineer is:",
-            "title": oncall["name"],
-            "title_link": oncall["html_url"],
-            "fields": [{
-                "title": "IRC",
-                "value": oncall["irc_nick"],
-                "short": "true"
-            },
-            {
-                "title": "Slack",
-                "value": oncall["slack_nick"],
-                "short": "true"
-            },
-            {
-                "title": "Email",
-                "value": oncall["email"],
-                "short": "true"
-            }],
-            "thumb_url": oncall["avatar_url"],
-            "footer": "Oncall from {0} to {1}.".format(oncall["start"],oncall["end"])
-        }])
-        slack_client.api_call(
-                "chat.postMessage",
-                channel = channel,
-                attachments = attachments)
+        post_current_oncall(channel)
         return
 
     # Sends the response back to the channel
@@ -122,9 +129,16 @@ if __name__ == "__main__":
         print("Starter Bot connected and running!")
         # Read bot's user ID by calling Web API method `auth.test`
         starterbot_id = slack_client.api_call("auth.test")["user_id"]
-        # TODO: make it do this once per minute and automatically post it to #netops when it changes
-        oncall = get_oncall()
+        last_oncall_check = 0
+        last_oncall_user = 'nobody'
         while True:
+            ts = time.time()
+            if (ts - last_oncall_check) > 60:
+                oncall = get_oncall()
+                last_oncall_check = ts
+                if (oncall["email"] != last_oncall_user):
+                    post_current_oncall("netops","The current oncall network engineer is now:")
+                    last_oncall_user = oncall["email"]
             command, channel = parse_bot_commands(slack_client.rtm_read())
             if command:
                 handle_command(command, channel)
