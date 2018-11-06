@@ -38,10 +38,18 @@ def get_oncall():
     oncall = decoded["oncalls"][0]["user"]
     oncall["start"] = decoded["oncalls"][0]["start"]
     oncall["end"] = decoded["oncalls"][0]["end"]
-    # TODO: parse text of "description" field ("Bio" in the UI) to get IRC
+    # parse text of "description" field ("Bio" in the UI) to get IRC
     # and Slack if present, but fall back to first part of email if not given
     oncall["irc_nick"] = oncall["email"].split("@")[0]
     oncall["slack_nick"] = oncall["email"].split("@")[0]
+    # check for an IRC nick in the Bio field
+    match = re.search(':(\S+)', oncall["description"])
+    if match:
+        oncall["irc_nick"] = match.group(1)
+    # check for a Slack nick in the Bio field
+    match = re.search('@(.+) on Slack', oncall["description"])
+    if match:
+        oncall["slack_nick"] = match.group(1)
     return oncall
 
 def parse_bot_commands(slack_events):
