@@ -13,15 +13,14 @@ with open("config.yml", 'r') as ymlfile:
 # instantiate Slack client
 slack_client = SlackClient(cfg['slack_api_token'])
 
-# starterbot's user ID in Slack: value is assigned after the bot starts up
-starterbot_id = None
+# the bot's user ID in Slack: value is assigned after the bot starts up
+bot_id = None
 
 # oncall person object
 oncall = cfg["default_oncall"]
 
 # constants
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
-EXAMPLE_COMMAND = "do"
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
 
 def get_oncall():
@@ -54,7 +53,7 @@ def parse_bot_commands(slack_events):
     for event in slack_events:
         if event["type"] == "message" and not "subtype" in event:
             user_id, message = parse_direct_mention(event["text"])
-            if user_id == starterbot_id:
+            if user_id == bot_id:
                 return message, event["channel"]
     return None, None
 
@@ -105,19 +104,17 @@ def handle_command(command, channel):
         Executes bot command if the command is known
     """
     # Default response is help text for the user
-    default_response = "Not sure what you mean. Try *{}*.".format(EXAMPLE_COMMAND)
+    default_response = "Not sure what you mean. Try 'oncall'"
 
     # Finds and executes the given command, filling in response
     response = None
-    # This is where you start to implement more commands!
-    if command.startswith(EXAMPLE_COMMAND):
-        response = "Sure...write some more code then I can do that!"
-
+    # Implement commands here!
     if command.startswith("oncall"):
         post_current_oncall(channel)
         return
 
-    # Sends the response back to the channel
+    # Sends the response back to the channel if the command returned one
+    # instead of exiting
     slack_client.api_call(
         "chat.postMessage",
         channel=channel,
@@ -126,9 +123,9 @@ def handle_command(command, channel):
 
 if __name__ == "__main__":
     if slack_client.rtm_connect(with_team_state=False):
-        print("Starter Bot connected and running!")
+        print("Netops Bot connected and running!")
         # Read bot's user ID by calling Web API method `auth.test`
-        starterbot_id = slack_client.api_call("auth.test")["user_id"]
+        bot_id = slack_client.api_call("auth.test")["user_id"]
         last_oncall_check = 0
         last_oncall_user = 'nobody'
         while True:
