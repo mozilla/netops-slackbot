@@ -22,6 +22,7 @@ oncall = cfg["default_oncall"]
 # constants
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
+DEFAULT_CHANNEL = "netops" # make this netops-bots for testing, change back to netops before committing
 
 def get_oncall():
     headers = {
@@ -101,6 +102,12 @@ def post_current_oncall(channel, pretext="The current oncall network engineer is
         "thumb_url": oncall["avatar_url"],
         "footer": "Oncall from {0} to {1}.".format(oncall["start"],oncall["end"])
     }])
+    channel_info = slack_client.api_call(
+            "conversations.info",
+            channel = channel)
+    if not channel_info["ok"]:
+        print("Got an error from conversations.info: %s" % channel_info["error"])
+    print("Posting current oncall (%s) to #%s" % (oncall["email"], channel_info["channel"]["name"]))
     slack_client.api_call(
             "chat.postMessage",
             channel = channel,
@@ -135,15 +142,23 @@ if __name__ == "__main__":
         # Read bot's user ID by calling Web API method `auth.test`
         bot_id = slack_client.api_call("auth.test")["user_id"]
         last_oncall_check = 0
-        last_oncall_user = 'nobody'
+        state = { "current_oncall": "nobody" }
+        try:
+            with open("state.yml", 'r') as ymlfile:
+                state = yaml.load(ymlfile)
+        except IOError:
+            pass
         while True:
             ts = time.time()
             if (ts - last_oncall_check) > 60:
                 oncall = get_oncall()
                 last_oncall_check = ts
-                if (oncall["email"] != last_oncall_user):
-                    post_current_oncall("netops","The current oncall network engineer is now:")
-                    last_oncall_user = oncall["email"]
+                if (oncall["email"] != state['current_oncall']):
+                    print("Oncall changed from %s to %s" % (state["current_oncall"], oncall["email"]))
+                    post_current_oncall(DEFAULT_CHANNEL,"The current oncall network engineer is now:")
+                    state['current_oncall'] = oncall["email"]
+                    with open('state.yml', 'w') as outfile:
+                        yaml.dump(state, outfile, default_flow_style=False)
             command, channel = parse_bot_commands(slack_client.rtm_read())
             if command:
                 handle_command(command, channel)
