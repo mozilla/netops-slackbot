@@ -20,11 +20,13 @@ bot_id = None
 oncall = cfg["default_oncall"]
 
 # constants
+RECONNECT_DELAY = 30 # how long to wait between retries when the connection fails
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
 DEFAULT_CHANNEL = "netops" # make this netops-bots for testing, change back to netops before committing
 
 def get_oncall():
+    global oncall
     headers = {
         'Authorization': 'Token token={0}'.format(cfg["pagerduty_api_token"]),
         'Content-Type': 'application/vnd.pagerduty+json;version=2',
@@ -32,26 +34,33 @@ def get_oncall():
     url = 'https://api.pagerduty.com/oncalls?time_zone=UTC&include%5B%5D=users&escalation_policy_ids%5B%5D={0}&schedule_ids%5B%5D={1}'.format(cfg["pagerduty_escalation_policy"],cfg["pagerduty_oncall_schedule"])
     try:
         r = requests.get(url, headers=headers, timeout=30)
+        decoded = json.loads(r.text)
+        oncall = decoded["oncalls"][0]["user"]
+        oncall["start"] = decoded["oncalls"][0]["start"]
+        oncall["end"] = decoded["oncalls"][0]["end"]
+        # parse text of "description" field ("Bio" in the UI) to get IRC
+        # and Slack if present, but fall back to first part of email if not given
+        oncall["irc_nick"] = oncall["email"].split("@")[0]
+        oncall["slack_nick"] = oncall["email"].split("@")[0]
+        # check for an IRC nick in the Bio field
+        match = re.search(':(\S+)', oncall["description"])
+        if match:
+            oncall["irc_nick"] = match.group(1)
+        # check for a Slack nick in the Bio field
+        match = re.search('@(.+) on Slack', oncall["description"])
+        if match:
+            oncall["slack_nick"] = match.group(1)
     except requests.Timeout:
-        print "PagerDuty API timed out!"
+        print("PagerDuty API timed out!")
+        pass
+    except requests.exceptions.ConnectionError as e:
+        print("PagerDuty API failed to connect: %s" % e)
+        pass
+    except Exception as e:
+        print("Got an error looking up the oncall in PagerDuty: %s" % e)
+        raise
 
-    decoded = json.loads(r.text)
-    oncall = decoded["oncalls"][0]["user"]
-    oncall["start"] = decoded["oncalls"][0]["start"]
-    oncall["end"] = decoded["oncalls"][0]["end"]
-    # parse text of "description" field ("Bio" in the UI) to get IRC
-    # and Slack if present, but fall back to first part of email if not given
-    oncall["irc_nick"] = oncall["email"].split("@")[0]
-    oncall["slack_nick"] = oncall["email"].split("@")[0]
-    # check for an IRC nick in the Bio field
-    match = re.search(':(\S+)', oncall["description"])
-    if match:
-        oncall["irc_nick"] = match.group(1)
-    # check for a Slack nick in the Bio field
-    match = re.search('@(.+) on Slack', oncall["description"])
-    if match:
-        oncall["slack_nick"] = match.group(1)
-    return oncall
+    return
 
 def parse_bot_commands(slack_events):
     """
@@ -137,32 +146,43 @@ def handle_command(command, channel):
     )
 
 if __name__ == "__main__":
-    if slack_client.rtm_connect(with_team_state=False):
-        print("Netops Bot connected and running!")
-        # Read bot's user ID by calling Web API method `auth.test`
-        bot_id = slack_client.api_call("auth.test")["user_id"]
-        last_oncall_check = 0
-        state = { "current_oncall": "nobody" }
+    while True:
         try:
-            with open("state.yml", 'r') as ymlfile:
-                state = yaml.load(ymlfile)
-        except IOError:
+            print("Connecting to Slack...")
+            connected = slack_client.rtm_connect(with_team_state=False, auto_reconnect=True)
+            if connected:
+                print("Netops Bot connected and running!")
+                # Read bot's user ID by calling Web API method `auth.test`
+                bot_id = slack_client.api_call("auth.test")["user_id"]
+                last_oncall_check = 0
+                state = { "current_oncall": "nobody" }
+                try:
+                    with open("state.yml", 'r') as ymlfile:
+                        state = yaml.load(ymlfile)
+                except IOError:
+                    pass
+                while True:
+                    ts = time.time()
+                    if (ts - last_oncall_check) > 60:
+                        get_oncall()
+                        last_oncall_check = ts
+                        if (oncall["email"] != state['current_oncall']):
+                            print("Oncall changed from %s to %s" % (state["current_oncall"], oncall["email"]))
+                            post_current_oncall(DEFAULT_CHANNEL,"The current oncall network engineer is now:")
+                            state['current_oncall'] = oncall["email"]
+                            with open('state.yml', 'w') as outfile:
+                                yaml.dump(state, outfile, default_flow_style=False)
+                    command, channel = parse_bot_commands(slack_client.rtm_read())
+                    if command:
+                        handle_command(command, channel)
+                    time.sleep(RTM_READ_DELAY)
+            else:
+                print("Connection failed.")
+                print("Making another attempt in %d seconds..." % RECONNECT_DELAY)
+                time.sleep(RECONNECT_DELAY)
+        except requests.exceptions.ConnectionError as e:
+            print("Connection disconnected: %s" % e)
+            print("Re-connecting in %d seconds..." % RECONNECT_DELAY)
+            time.sleep(RECONNECT_DELAY)
             pass
-        while True:
-            ts = time.time()
-            if (ts - last_oncall_check) > 60:
-                oncall = get_oncall()
-                last_oncall_check = ts
-                if (oncall["email"] != state['current_oncall']):
-                    print("Oncall changed from %s to %s" % (state["current_oncall"], oncall["email"]))
-                    post_current_oncall(DEFAULT_CHANNEL,"The current oncall network engineer is now:")
-                    state['current_oncall'] = oncall["email"]
-                    with open('state.yml', 'w') as outfile:
-                        yaml.dump(state, outfile, default_flow_style=False)
-            command, channel = parse_bot_commands(slack_client.rtm_read())
-            if command:
-                handle_command(command, channel)
-            time.sleep(RTM_READ_DELAY)
-    else:
-        print("Connection failed. Exception traceback printed above.")
 
