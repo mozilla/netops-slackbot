@@ -18,12 +18,24 @@ bot_id = None
 
 # oncall person object
 oncall = cfg["default_oncall"]
+channels = {}
 
 # constants
 RECONNECT_DELAY = 30 # how long to wait between retries when the connection fails
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
 DEFAULT_CHANNEL = "netops" # make this netops-bots for testing, change back to netops before committing
+DEBUG = 0
+
+def get_channels():
+    channel_list = slack_client.api_call("users.conversations", types="public_channel,private_channel")
+    if DEBUG:
+        print("Fetching users.conversations:")
+        print(json.dumps(channel_list, indent=4))
+    global channels
+    channels = {}
+    for channelobj in channel_list['channels']:
+        channels[channelobj['name']] = channelobj
 
 def get_oncall():
     global oncall
@@ -115,12 +127,15 @@ def post_current_oncall(channel, pretext="The current oncall network engineer is
             "conversations.info",
             channel = channel)
     if not channel_info["ok"]:
+        print("Looking up channel: %s" % channel)
         print("Got an error from conversations.info: %s" % channel_info["error"])
-    print("Posting current oncall (%s) to #%s" % (oncall["email"], channel_info["channel"]["name"]))
-    slack_client.api_call(
-            "chat.postMessage",
-            channel = channel,
-            attachments = attachments)
+        print(json.dumps(channel_info))
+    else:
+        print("Posting current oncall (%s) to #%s" % (oncall["email"], channel_info["channel"]["name"]))
+        slack_client.api_call(
+                "chat.postMessage",
+                channel = channel,
+                attachments = attachments)
     return
 
 def handle_command(command, channel):
@@ -156,6 +171,7 @@ if __name__ == "__main__":
                 bot_id = slack_client.api_call("auth.test")["user_id"]
                 last_oncall_check = 0
                 state = { "current_oncall": "nobody" }
+                get_channels()
                 try:
                     with open("state.yml", 'r') as ymlfile:
                         state = yaml.load(ymlfile)
@@ -168,7 +184,7 @@ if __name__ == "__main__":
                         last_oncall_check = ts
                         if (oncall["email"] != state['current_oncall']):
                             print("Oncall changed from %s to %s" % (state["current_oncall"], oncall["email"]))
-                            post_current_oncall(DEFAULT_CHANNEL,"The current oncall network engineer is now:")
+                            post_current_oncall(channels[DEFAULT_CHANNEL]['id'],"The current oncall network engineer is now:")
                             state['current_oncall'] = oncall["email"]
                             with open('state.yml', 'w') as outfile:
                                 yaml.dump(state, outfile, default_flow_style=False)
@@ -185,4 +201,10 @@ if __name__ == "__main__":
             print("Re-connecting in %d seconds..." % RECONNECT_DELAY)
             time.sleep(RECONNECT_DELAY)
             pass
+        except Exception as e:
+            print("Connection disconnected: %s" % e)
+            #print("Re-connecting in %d seconds..." % RECONNECT_DELAY)
+            #time.sleep(RECONNECT_DELAY)
+            #pass
+            raise
 
