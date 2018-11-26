@@ -55,13 +55,14 @@ def get_oncall():
         oncall["irc_nick"] = oncall["email"].split("@")[0]
         oncall["slack_nick"] = oncall["email"].split("@")[0]
         # check for an IRC nick in the Bio field
-        match = re.search(':(\S+)', oncall["description"])
-        if match:
-            oncall["irc_nick"] = match.group(1)
-        # check for a Slack nick in the Bio field
-        match = re.search('@(.+) on Slack', oncall["description"])
-        if match:
-            oncall["slack_nick"] = match.group(1)
+        if oncall["description"]:
+            match = re.search(':(\S+)', oncall["description"])
+            if match:
+                oncall["irc_nick"] = match.group(1)
+            # check for a Slack nick in the Bio field
+            match = re.search('@(.+) on Slack', oncall["description"])
+            if match:
+                oncall["slack_nick"] = match.group(1)
     except requests.Timeout:
         print("PagerDuty API timed out!")
         pass
