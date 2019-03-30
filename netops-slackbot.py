@@ -8,7 +8,7 @@ import json
 import requests
 
 with open("config.yml", 'r') as ymlfile:
-    cfg = yaml.load(ymlfile)
+    cfg = yaml.safe_load(ymlfile)
 
 # instantiate Slack client
 slack_client = SlackClient(cfg['slack_api_token'])
@@ -179,7 +179,11 @@ if __name__ == "__main__":
                 get_channels()
                 try:
                     with open("state.yml", 'r') as ymlfile:
-                        state = yaml.load(ymlfile)
+                        try:
+                            state = yaml.safe_load(ymlfile)
+                        except:
+                            state = { "current_oncall": "nobody" }
+                            pass
                 except IOError:
                     pass
                 while True:
@@ -192,7 +196,7 @@ if __name__ == "__main__":
                             post_current_oncall(channels[DEFAULT_CHANNEL]['id'],"The current oncall network engineer is now:")
                             state['current_oncall'] = oncall["email"]
                             with open('state.yml', 'w') as outfile:
-                                yaml.dump(state, outfile, default_flow_style=False)
+                                yaml.safe_dump(state, outfile, default_flow_style=False)
                     command, channel = parse_bot_commands(slack_client.rtm_read())
                     if command:
                         handle_command(command, channel)
