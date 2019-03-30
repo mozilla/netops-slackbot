@@ -137,6 +137,10 @@ def post_current_oncall(channel, pretext="The current oncall network engineer is
                 "chat.postMessage",
                 channel = channel,
                 attachments = attachments)
+        #slack_client.api_call(
+        #        "conversations.setTopic",
+        #        channel = channel,
+        #        topic = "Current NetOps oncall is %s" % oncall["slack_nick"])
     return
 
 def handle_command(command, channel):
@@ -204,8 +208,8 @@ if __name__ == "__main__":
             pass
         except Exception as e:
             print("Connection disconnected: %s" % e)
-            #print("Re-connecting in %d seconds..." % RECONNECT_DELAY)
-            #time.sleep(RECONNECT_DELAY)
-            #pass
-            raise
+            print("Re-connecting in %d seconds..." % RECONNECT_DELAY)
+            time.sleep(RECONNECT_DELAY)
+            pass
+            #raise
 
