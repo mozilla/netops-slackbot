@@ -2,6 +2,6 @@ requests>=2.20.0
 simplejson>=3.10.0
 DateTime>=4.3
 slackclient>=1.3.0
-websocket-client>=0.53.0
+websocket-client<0.55.0,>=0.53
 zope.interface>=4.5.0
 PyYAML>=4.2b1
