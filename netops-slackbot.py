@@ -24,7 +24,7 @@ channels = {}
 RECONNECT_DELAY = 30 # how long to wait between retries when the connection fails
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
-DEFAULT_CHANNEL = "netops" # make this netops-bots for testing, change back to netops before committing
+DEFAULT_CHANNEL = cfg["oncall_announce_channel"]
 DEBUG = 0
 
 def get_channels():
