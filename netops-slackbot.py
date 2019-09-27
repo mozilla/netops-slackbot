@@ -8,6 +8,7 @@ import ssl as ssl_lib
 import certifi
 import asyncio
 import nest_asyncio
+from aiohttp.client_exceptions import ClientHttpProxyError
 
 # constants
 RECONNECT_DELAY = 30 # how long to wait between retries when the connection fails
@@ -166,9 +167,17 @@ if __name__ == "__main__":
     except IOError:
         pass
     event_loop = asyncio.get_event_loop()
+    proxy = None
+    try:
+        proxy = os.environ["HTTPS_PROXY"]
+        proxy = "http://" + proxy
+        print("Using proxy: %s" % proxy)
+    except:
+        proxy = None
     rtm_client = slack.RTMClient(
         token=cfg['slack_api_token'],
         ssl=ssl_context,
+        proxy=proxy,
         loop=event_loop,
         connect_method='rtm.start'
     )
@@ -177,6 +186,9 @@ if __name__ == "__main__":
         rtm_client.start()
         print("")
         print("rtm_client exited")
+    except ClientHttpProxyError as e:
+        print("rtm_client exited with an error: %s" % e)
+        print("Requested URL: %s" % e.request_info.url)
     except Exception as e:
         print("rtm_client exited with an error: %s" % e)
         raise
