@@ -3,6 +3,7 @@ pagerduty_api_token: NOT_SET
 pagerduty_oncall_schedule: NOT_SET
 pagerduty_escalation_policy: NOT_SET
 oncall_announce_channel: netops-bots
+prefix_char: !
 default_oncall:
     name: Wesley!
     irc_nick: wesley

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os
+import re
 import yaml
 import json
 import requests
@@ -11,8 +12,6 @@ import nest_asyncio
 from aiohttp.client_exceptions import ClientHttpProxyError
 
 # constants
-RECONNECT_DELAY = 30 # how long to wait between retries when the connection fails
-PREFIX_CHAR = "!"
 DEBUG = 1
 polling_initialized = 0
 nest_asyncio.apply()
@@ -144,7 +143,7 @@ def message(**payload):
     user_id = data.get("user")
     text = data.get("text")
 
-    if text and text.lower() == PREFIX_CHAR + "oncall":
+    if text and text.lower() == cfg['prefix_char'] + "oncall":
         return post_current_oncall(web_client, channel_id)
 
 if __name__ == "__main__":
