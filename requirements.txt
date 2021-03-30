@@ -8,7 +8,7 @@ PyYAML==5.4
 nest-asyncio==1.2.0
 ## The following requirements were added by pip freeze:
 aiodns==2.0.0
-aiohttp==3.5.4
+aiohttp==3.7.4
 async-timeout==3.0.1
 attrs==19.1.0
 certifi==2019.6.16
