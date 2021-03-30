@@ -4,7 +4,7 @@ DateTime==4.3
 slackclient==2.2.0
 websocket-client==0.54.0
 zope.interface==4.6.0
-PyYAML==5.1.2
+PyYAML==5.4
 nest-asyncio==1.2.0
 ## The following requirements were added by pip freeze:
 aiodns==2.0.0
